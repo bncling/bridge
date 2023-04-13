@@ -174,6 +174,7 @@ def get_opening_bid(player, partner_passed):
 
 def interpret_opening_bid(opening_bid):
 	interpretation = [(0,40), (0,40), [(0,13), (0,13), (0,13), (0,13)]]
+	fit_suit = 4
 
 	# 1 level bids, either suit or NT
 	if opening_bid.level == 1:
@@ -218,17 +219,18 @@ def interpret_opening_bid(opening_bid):
 
 	# stuff for 3 level preempts
 
-	return interpretation
+	return (interpretation, fit_suit)
 
 
 def interpret_overcall(auction, opener):
 	# opponents will always pass for now
 	interpretation = [(0,40), (0,40), [(0,13), (0,13), (0,13), (0,13)]]
+	fit_suit = 4
 
 	opening_bid = auction.bid_history[opener]
 	overcall_bid = auction.bid_history[opener + 1]
 
-	return interpretation
+	return (interpretation, fit_suit)
 
 
 # partner has opened the auction, overcaller has passed, get next bid
@@ -311,9 +313,11 @@ def get_responding_bid(player, prev_partner_bid, overcalled = False):
 					bid_to_make = Bid(3, prev_partner_bid.suit).abbr
 					player.update_suit(prev_partner_bid.suit)
 				else:
-					# consider the other suits
-					bid_to_make = Bid(2, second_suit).abbr
-					req_next_bid = Bid(4, prev_partner_bid.suit).abbr
+					# with at least four card support, make a Jacoby 2NT bid
+					if player.hand.lengths[prev_partner_bid.suit] >= 4:
+						bid_to_make = "2N"
+					else:
+						bid_to_make = Bid(4, prev_partner_bid.suit).abbr
 
 			# can raise 1H to 1S with 4 spades and no heart support
 			elif (prev_partner_bid.suit == 2) and (player.hand.lengths[3] >= 4):
@@ -344,6 +348,7 @@ def get_responding_bid(player, prev_partner_bid, overcalled = False):
 
 def interpret_response(auction, opener):
 	interpretation = [(0,40), (0,40), [(0,13), (0,13), (0,13), (0,13)]]
+	fit_suit = 4
 
 	opening_bid = auction.bid_history[opener]
 	resp_bid = auction.bid_history[opener + 2]
@@ -425,6 +430,7 @@ def interpret_response(auction, opener):
 
 		# responding in the same suit
 		if resp_bid.suit == opening_bid.suit:
+			fit_suit = opening_bid.suit
 			for i in range(4):
 				if i == resp_bid.suit:
 					interpretation[2][i] = (3,13)
@@ -433,9 +439,23 @@ def interpret_response(auction, opener):
 			if resp_bid.level == 2:
 				interpretation[0] = (0,10)
 				interpretation[1] = (6,10)
-			if resp_bid.level == 3:
+			elif resp_bid.level == 3:
 				interpretation[0] = (1,12)
 				interpretation[1] = (11,12)
+			elif resp_bid.level == 4:
+				interpretation[0] = (3,40)
+				interpretation[1] = (13,40)
+
+		# responding with a Jacoby 2NT bid
+		elif (resp_bid.suit == 4) and (resp_bid.level == 2):
+			for i in range(4):
+				if i == opening_bid.suit:
+					interpretation[2][i] = (4,13)
+				else:
+					interpretation[2][i] = (0,9)
+			interpretation[0] = (3,40)
+			interpretation[1] = (13,40)
+			fit_suit = opening_bid.suit
 
 		# raising 1H -> 1S
 		elif (opening_bid.abbr == '1H') and (resp_bid.abbr == '1S'):
@@ -487,7 +507,7 @@ def interpret_response(auction, opener):
 	if resp_bid.level == 0:
 		interpretation = [(0,5), (0,40), [(0,13), (0,13), (0,13), (0,13)]]
 
-	return interpretation
+	return (interpretation, fit_suit)
 
 
 def get_opener_rebid(player, opening_bid, resp_bid, auction):
@@ -528,7 +548,7 @@ def get_opener_rebid(player, opening_bid, resp_bid, auction):
 	if (opening_bid.suit in [0,1]) and (opening_bid.level == 1):
 
 		# responding 1 of a minor (1C - 1D)
-		if (resp_bid.suit in [0,1]) and (opening_bid.level == 1):
+		if (resp_bid.suit in [0,1]) and (resp_bid.level == 1):
 
 			# bid a major with four of them, hearts first
 			if player.hand.lengths[2] >= 4:
@@ -617,13 +637,16 @@ def get_opener_rebid(player, opening_bid, resp_bid, auction):
 
 def update_interpretations(interpretation, new_information, player_index):
 
+	fit_suit = new_information[1]
+	new_information = new_information[0]
+
 	for i in range(2):
 		interpretation[i][player_index] = (max(interpretation[i][player_index][0], new_information[i][0]), min(interpretation[i][player_index][1], new_information[i][1]))
 
 	for i in range(4):
 		interpretation[2][player_index][i] = (max(interpretation[2][player_index][i][0], new_information[2][i][0]), min(interpretation[2][player_index][i][1], new_information[2][i][1]))
 
-	return interpretation
+	return interpretation, fit_suit
 
 
 def interpret_auction(auction):
@@ -643,15 +666,27 @@ def interpret_auction(auction):
 		else:
 			opener = bid_index
 			passed_so_far = False
-			shown_hcp, shown_points, shown_lengths = update_interpretations((shown_hcp, shown_points, shown_lengths), interpret_opening_bid(auction.bid_history[bid_index]), (bid_index + auction.dealer) % 4)
+			(shown_hcp, shown_points, shown_lengths), fit_suit = update_interpretations((shown_hcp, shown_points, shown_lengths), interpret_opening_bid(auction.bid_history[bid_index]), (bid_index + auction.dealer) % 4)
+			if (bid_index + auction.dealer) % 2 == 0:
+				n_s_fit.append(fit_suit)
+			else:
+				e_w_fit.append(fit_suit)
 		bid_index += 1
 
 	# next player to bid is the overcaller, interpret their bid (PASS for now)
-	shown_hcp, shown_points, shown_lengths = update_interpretations((shown_hcp, shown_points, shown_lengths), interpret_overcall(auction, opener), (bid_index + auction.dealer) % 4)
+	(shown_hcp, shown_points, shown_lengths), fit_suit = update_interpretations((shown_hcp, shown_points, shown_lengths), interpret_overcall(auction, opener), (bid_index + auction.dealer) % 4)
+	if (bid_index + auction.dealer) % 2 == 0:
+		n_s_fit.append(fit_suit)
+	else:
+		e_w_fit.append(fit_suit)
 	bid_index += 1
 
 	# next player to bid is the responder, interpret their bid
-	shown_hcp, shown_points, shown_lengths = update_interpretations((shown_hcp, shown_points, shown_lengths), interpret_response(auction, opener), (bid_index + auction.dealer) % 4)
+	(shown_hcp, shown_points, shown_lengths), fit_suit = update_interpretations((shown_hcp, shown_points, shown_lengths), interpret_response(auction, opener), (bid_index + auction.dealer) % 4)
+	if (bid_index + auction.dealer) % 2 == 0:
+		n_s_fit.append(fit_suit)
+	else:
+		e_w_fit.append(fit_suit)
 	bid_index += 1
 
 	# update max values, if one player has e.g. 3 hearts, new max is 10 hearts 
@@ -671,6 +706,7 @@ def interpret_auction(auction):
 		new_most = 40 - (collective_hcp - shown_hcp[i][0])
 		shown_hcp[i] = (shown_hcp[i][0], min([new_most, shown_hcp[i][1]]))
 
+	''' OLD WAY OF CHECKING FITS
 	# check for north/south fit
 	for north_bid in [bid for bid in [bidd for bidd in auction.bid_table[0]if bidd != ''] if bid.level != 0]:
 		if n_s_fit != 4:
@@ -688,6 +724,11 @@ def interpret_auction(auction):
 			if east_bid.suit == west_bid.suit:
 				e_w_fit = [east_bid.suit, auction.e_w_first_bidders[east_bid.suit]]
 				break
+	'''
+
+	# make sure there's only one copy of each "suit" in the fit lists
+	n_s_fit = list(set(n_s_fit))
+	e_w_fit = list(set(e_w_fit))
 
 	return (shown_hcp, shown_points, shown_lengths, n_s_fit, e_w_fit)
 
