@@ -238,11 +238,16 @@ def get_responding_bid(player, prev_partner_bid, overcalled = False):
 	bid_to_make = 'P'
 	forcing = False
 
-	# what is the best suit other than partner's?
+	# what are the best suits other than partner's?
 	other_lengths = list(player.hand.lengths)
-	if (prev_partner_bid.suit != 4) and (prev_partner_bid.abbr != 'P'):
-		other_lengths[prev_partner_bid.suit] = 0
-	second_suit = np.argmax(other_lengths)
+	suits_by_length = []
+	for i in range(4):
+		suits_by_length.append(np.argmax(other_lengths))
+		other_lengths[np.argmax(other_lengths)] = 0
+	candidate_suits = []
+	for suit in suits_by_length:
+		if (suit != prev_partner_bid.suit) and (player.hand.lengths[suit] >= 4) and ((player.hand.suit_hcp[suit] >= 4) or (player.hand.lengths[suit] >= 5)):
+			candidate_suits.append(suit)
 
 	req_next_bid = None
 
@@ -284,10 +289,8 @@ def get_responding_bid(player, prev_partner_bid, overcalled = False):
 			# bid the other minor with five of them
 			elif (player.hand.lengths[1] >= 5) and (prev_partner_bid.suit == 0):
 				bid_to_make = "1D"
-				player.update_suit(1)
 			elif (player.hand.lengths[0] >= 5) and (prev_partner_bid.suit == 1) and (player.hand.hcp >= 10):
 				bid_to_make = "2C"
-				player.update_suit(0)
 
 			# if none of the above fit, bid some NT to show point count
 			elif player.hand.hcp <= 9:
@@ -308,10 +311,8 @@ def get_responding_bid(player, prev_partner_bid, overcalled = False):
 						pts += 5 - 2*length
 				if pts <= 10:
 					bid_to_make = Bid(2, prev_partner_bid.suit).abbr
-					player.update_suit(prev_partner_bid.suit)
 				elif pts <= 12:
 					bid_to_make = Bid(3, prev_partner_bid.suit).abbr
-					player.update_suit(prev_partner_bid.suit)
 				else:
 					# with at least four card support, make a Jacoby 2NT bid
 					if player.hand.lengths[prev_partner_bid.suit] >= 4:
@@ -322,21 +323,14 @@ def get_responding_bid(player, prev_partner_bid, overcalled = False):
 			# can raise 1H to 1S with 4 spades and no heart support
 			elif (prev_partner_bid.suit == 2) and (player.hand.lengths[3] >= 4):
 				bid_to_make = "1S"
-				player.update_suit(3)
 
 			# if there is a strong suit other than partner's, bid it at 2 level
-			elif (player.hand.hcp >= 10) and (player.hand.suit_hcp[second_suit] >= 6) and (player.hand.lengths[second_suit] >= 5):
-				bid_to_make	= Bid(2, second_suit).abbr
-				player.update_suit(second_suit)
+			elif (player.hand.hcp >= 10) and (candidate_suits != []):
+				bid_to_make	= Bid(2, candidate_suits[0]).abbr
 
 			# if not in the above cases, there's no major fit and no strong second suit
 			else:
-				if player.hand.hcp <= 10:
-					bid_to_make = '1N'
-				elif player.hand.hcp <= 12:
-					bid_to_make = '2N'
-				elif player.hand.hcp <= 15:
-					bid_to_make = '3N'
+				bid_to_make = "1N"
 
 	# bid to make is forcing if it is a new suit, not NT
 	if bid_to_make != 'P':
@@ -401,8 +395,8 @@ def interpret_response(auction, opener):
 		# bidding no trump
 		elif resp_bid.suit == 4:
 			if resp_bid.level == 1:
-				interpretation[0] = (6,9)
-				interpretation[1] = (6,9)
+				interpretation[0] = (6,10)
+				interpretation[1] = (6,10)
 				for i in range(4):
 					if i == opening_bid.suit:
 						interpretation[2][i] = (0,4)
@@ -472,24 +466,24 @@ def interpret_response(auction, opener):
 			interpretation[1] = (10,40)
 			for i in range(4):
 				if i == resp_bid.suit:
-					interpretation[2][i] = (5,13)
+					interpretation[2][i] = (4,13)
 				elif i == opening_bid.suit:
-					interpretation[2][i] = (0,13)
+					interpretation[2][i] = (0,2)
 				else:
 					interpretation[2][i] = (0,6)
 
-		# responding with no trump
-		elif resp_bid.suit == 4:
-			if resp_bid.level == 1:
-				interpretation[0] = (6,9)
-				interpretation[1] = (6,9)
-				for i in range(4):
-					if i == opening_bid.suit:
-						interpretation[2][i] = (0,2)
-					elif (i == 3) and (opening_bid.suit == 2):
-						interpretation[2][i] = (0,3)
-					else: 
-						interpretation[2][i] = (0,13)
+		# responding with 1NT
+		elif (resp_bid.suit == 4) and (resp_bid.level == 1):
+			interpretation[0] = (6,10)
+			interpretation[1] = (6,10)
+			for i in range(4):
+				if i == opening_bid.suit:
+					interpretation[2][i] = (0,2)
+				elif (i == 3) and (opening_bid.suit == 2):
+					interpretation[2][i] = (0,3)
+				else: 
+					interpretation[2][i] = (0,11)
+			'''
 			else:
 				for i in range(4):
 					if i == opening_bid.suit:
@@ -502,7 +496,7 @@ def interpret_response(auction, opener):
 				elif resp_bid.level == 3:
 					interpretation[0] = (13,40)
 					interpretation[1] = (13,40)
-
+			'''
 
 	if resp_bid.level == 0:
 		interpretation = [(0,5), (0,40), [(0,13), (0,13), (0,13), (0,13)]]
@@ -629,6 +623,10 @@ def get_opener_rebid(player, opening_bid, resp_bid, auction):
 					bid_to_make = Bid(3, candidates[0]).abbr 
 				else:
 					bid_to_make = "3N"
+
+		# responding 1NT
+		elif (resp_bid.suit == 4) and (resp_bid.level == 1):
+			pass
 
 
 	print(bid_to_make)
