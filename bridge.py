@@ -628,6 +628,51 @@ def get_opener_rebid(player, opening_bid, resp_bid, auction):
 		elif (resp_bid.suit == 4) and (resp_bid.level == 1):
 			pass
 
+	# opening 1 of a major
+	elif (opening_bid.suit in [2,3]) and (opening_bid.level == 1):
+
+		# responding with support
+		if resp_bid.suit == opening_bid.suit:
+
+			# calculate points
+			pts = player.hand.hcp
+			for length in player.hand.lengths:
+				if length <= 2:
+					pts += 3 - length
+
+			# minimum raise by partner
+			if resp_bid.level == 2:
+
+				if pts <= 15:
+					bid_to_make = 'P'
+				elif (pts <= 18) and (candidates != []):
+					if candidates[0].suit < resp_bid.suit:
+						bid_to_make = Bid(3, candidates[0]).abbr 
+					else:
+						bid_to_make = Bid(2, candidates[0]).abbr 
+				elif (pts <= 18) and (player.hand.is_balanced):
+					bid_to_make = "2N"
+				elif pts <= 18:
+					bid_to_make = Bid(3, resp_bid.suit).abbr
+				else:
+					bid_to_make = Bid(4, resp_bid.suit).abbr
+
+			# invitational raise by partner
+			elif resp_bid.level == 3:
+
+				if pts <= 15:
+					bid_to_make = "P"
+				else:
+					bid_to_make = Bid(4, resp_bid.suit).abbr 
+
+			# partner has raised directly to game, showing no interest in slam
+			elif resp_bid.level == 4:
+				bid_to_make = "P"
+
+			# partner has made a Jacoby 2NT bid, game forcing with potential slam interest
+			elif resp_bid.abbr == "2N":
+				bid_to_make = Bid(4, resp_bid.suit).abbr # just for now
+
 
 	print(bid_to_make)
 	return bid_to_make
