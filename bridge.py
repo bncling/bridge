@@ -624,25 +624,82 @@ def get_opener_rebid(player, opening_bid, resp_bid, auction):
 				else:
 					bid_to_make = "3N"
 
-		# responding 1NT
-		elif (resp_bid.suit == 4) and (resp_bid.level == 1):
-			if player.hand.hcp <= 15:
-				bid_to_make = "P"
-			else:
-				if player.hand.hcp <= 18:
-					if player.hand.is_balanced():
+		# responding with support for the minor
+		elif resp_bid.suit == opening_bid.suit:
+			if opening_bid.level == 2:
+				if player.hand.hcp <= 15: 
+					bid_to_make = "P"
+				elif player.hand.is_balanced():
+					if player.hand.hcp <= 18:
 						bid_to_make = "2N"
-					elif candidates != []:
-						bid_to_make = Bid(2, candidates[0]).abbr 
 					else:
-						bid_to_make = Bid(2, opening_bid.suit).abbr
-				else:
-					if player.hand.is_balanced():
 						bid_to_make = "3N"
-					elif candidates != []:
-						bid_to_make = Bid(3, candidates[0]).abbr 
+				else:
+					bid_to_make = Bid(3, opening_bid.suit).abbr
+
+		# responding with the other minor (1D-2C)
+		elif (resp_bid.suit in [0,1]) and (resp_bid.level == 2):
+			if player.hand.hcp <= 15:
+				if player.hand.lengths[resp_bid.suit] >= 4:
+					bid_to_make = "P"
+				elif player.hand.lengths[opening_bid.suit] >= 5:
+					bid_to_make = Bid(2, opening_bid.suit).abbr 
+				elif player.hand.is_balanced():
+					bid_to_make = "2N"
+			elif player.hand.hcp <= 18:
+				if player.hand.lengths[resp_bid.suit] >= 4:
+					bid_to_make = Bid(3, resp_bid.suit).abbr
+				elif player.hand.lengths[opening_bid.suit] >= 5:
+					bid_to_make = Bid(3, opening_bid.suit).abbr 
+				else:
+					bid_to_make = "2N"
+			else:
+				if player.hand.is_balanced():
+					bid_to_make = "3N"
+				else:
+					bid_to_make = "3S"
+
+		# responding with no trump, https://bridgeoutloud.com/bidding/rebids-by-opener-after-1minor/
+		elif (resp_bid.suit == 4):
+			if resp_bid.level == 1:
+				if player.hand.hcp <= 15:
+					if player.hand.lengths[opening_bid.suit] >= 6:
+						bid_to_make = Bid(2, opening_bid.suit).abbr 
 					else:
-						bid_to_make = Bid(3, opening_bid.suit).abbr
+						bid_to_make = "P"
+				else:
+					if player.hand.hcp <= 18:
+						if player.hand.lengths[opening_bid.suit] >= 6:
+							bid_to_make = Bid(3, opening_bid.suit).abbr
+						elif candidates != []:
+							bid_to_make = Bid(2, candidates[0]).abbr 
+						else:
+							bid_to_make = "2N"
+					else:
+						if player.hand.lengths[opening_bid.suit] >= 6:
+							bid_to_make = Bid(3, opening_bid.suit).abbr
+						elif candidates != []:
+							bid_to_make = Bid(3, candidates[0]).abbr 
+						else:
+							bid_to_make = "3N"
+			elif resp_bid.level == 2:
+				if player.hand.hcp <= 15:
+					bid_to_make = "P"
+				elif (player.hand.hcp <= 18):
+					if player.hand.lengths[opening_bid.suit] >= 6:
+						bid_to_make = Bid(3, opening_bid.suit).abbr 
+					else:
+						bid_to_make = "3N"
+				else:
+					# really going for slam here is what makes more sense
+					bid_to_make = "P"
+			else: 
+				if player.hand.hcp <= 15:
+					bid_to_make = "P"
+				else:
+					# again you'd actually want to see about slam here
+					bid_to_make = "P"
+
 
 	# opening 1 of a major
 	elif (opening_bid.suit in [2,3]) and (opening_bid.level == 1):
