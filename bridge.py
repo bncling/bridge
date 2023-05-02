@@ -626,7 +626,23 @@ def get_opener_rebid(player, opening_bid, resp_bid, auction):
 
 		# responding 1NT
 		elif (resp_bid.suit == 4) and (resp_bid.level == 1):
-			pass
+			if player.hand.hcp <= 15:
+				bid_to_make = "P"
+			else:
+				if player.hand.hcp <= 18:
+					if player.hand.is_balanced():
+						bid_to_make = "2N"
+					elif candidates != []:
+						bid_to_make = Bid(2, candidates[0]).abbr 
+					else:
+						bid_to_make = Bid(2, opening_bid.suit).abbr
+				else:
+					if player.hand.is_balanced():
+						bid_to_make = "3N"
+					elif candidates != []:
+						bid_to_make = Bid(3, candidates[0]).abbr 
+					else:
+						bid_to_make = Bid(3, opening_bid.suit).abbr
 
 	# opening 1 of a major
 	elif (opening_bid.suit in [2,3]) and (opening_bid.level == 1):
